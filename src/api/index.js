@@ -6,6 +6,8 @@ import {
   uploadBytesResumable,
   getDownloadURL,
   ref as fRef,
+  deleteObject,
+  listAll,
 } from "firebase/storage";
 
 const firebaseConfig = {
@@ -88,7 +90,7 @@ export const addFileToStorage = async (id, file, cb) => {
       },
       () => {
         getDownloadURL(uploadTask.snapshot.ref).then((url) => {
-          cb(url);
+          cb(url, file.name);
         });
       }
     );
@@ -116,5 +118,17 @@ export const removeCollection = async (id) => {
     return true;
   } catch (error) {
     console.log("Error while removing collection: ", error);
+  }
+};
+
+export const removeAd = async (collection, image) => {
+  try {
+    const r = fRef(storage, collection + "/" + image);
+
+    await deleteObject(r);
+
+    return true;
+  } catch (error) {
+    console.log("Error while removing ad: ", error);
   }
 };

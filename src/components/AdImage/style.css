@@ -1,0 +1,14 @@
+.imageContainer {
+  display: "flex";
+  flex-direction: row;
+  align-items: center;
+  border: "1px solid black";
+  border-radius: 15%;
+  margin: 10;
+  justify-content: center;
+  padding: 10;
+}
+
+.image {
+  object-fit: contain;
+}
