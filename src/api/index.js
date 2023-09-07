@@ -9,6 +9,12 @@ import {
   deleteObject,
   listAll,
 } from "firebase/storage";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzmANVAN9nOvntVb9YYDCb8rRzOl4M4dg",
@@ -28,10 +34,67 @@ const analytics = getAnalytics(app);
 
 const database = getDatabase(app);
 const storage = getStorage(app);
+const auth = getAuth(app);
 
-export const getCollections = async () => {
+export const signUpManually = async (mail, pass) => {
   try {
-    const result = await get(child(ref(database), "collections/"));
+    const result = await createUserWithEmailAndPassword(auth, mail, pass);
+
+    if (result && result.user.uid) {
+      localStorage.setItem("gUId", result.user.uid);
+      localStorage.setItem("gMail", result.user.email);
+      localStorage.setItem(
+        "gAccessToken",
+        result.user.stsTokenManager.accessToken
+      );
+      localStorage.setItem(
+        "gRefreshToken",
+        result.user.stsTokenManager.refreshToken
+      );
+
+      return true;
+    }
+  } catch (error) {
+    console.log("Error while creating user: ", error);
+  }
+};
+
+export const signInManually = async (mail, pass) => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, mail, pass);
+
+    console.log("SIGN IN", result);
+
+    if (result) {
+      localStorage.setItem("gUId", result.user.uid);
+      localStorage.setItem("gMail", result.user.email);
+      localStorage.setItem(
+        "gAccessToken",
+        result.user.stsTokenManager.accessToken
+      );
+      localStorage.setItem(
+        "gRefreshToken",
+        result.user.stsTokenManager.refreshToken
+      );
+
+      return true;
+    }
+  } catch (error) {
+    console.log("Error while creating user: ", error);
+  }
+};
+
+export const signOutUser = async () => {
+  const result = await signOut(auth);
+
+  localStorage.clear();
+
+  return result;
+};
+
+export const getCollections = async (user) => {
+  try {
+    const result = await get(child(ref(database), user));
 
     if (result.exists()) {
       return Object.entries(result.val()).map((el) => el[1]);
@@ -43,9 +106,9 @@ export const getCollections = async () => {
   }
 };
 
-export const addCollection = async (name, description) => {
+export const addCollection = async (user, name, description) => {
   try {
-    await set(ref(database, "collections/" + name), {
+    await set(ref(database, user + "/" + name), {
       name,
       description,
       dateAdded: new Date().toDateString(),
@@ -57,9 +120,9 @@ export const addCollection = async (name, description) => {
   }
 };
 
-export const getSingleCollection = async (name) => {
+export const getSingleCollection = async (user, name) => {
   try {
-    const result = await get(child(ref(database), "collections/" + name));
+    const result = await get(child(ref(database), user + "/" + name));
 
     if (result.exists()) {
       return result.val();
@@ -71,9 +134,9 @@ export const getSingleCollection = async (name) => {
   }
 };
 
-export const addFileToStorage = async (id, file, cb) => {
+export const addFileToStorage = async (user, id, file, cb) => {
   try {
-    const storageRef = fRef(storage, `/${id}/${file.name}`);
+    const storageRef = fRef(storage, `${user}/${id}/${file.name}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     uploadTask.on(
@@ -99,10 +162,10 @@ export const addFileToStorage = async (id, file, cb) => {
   }
 };
 
-export const updateCollection = async (id, data) => {
+export const updateCollection = async (user, id, data) => {
   const updates = {};
 
-  updates["collections/" + id] = data;
+  updates[user + "/" + id] = data;
 
   try {
     await update(ref(database), updates);
@@ -111,9 +174,9 @@ export const updateCollection = async (id, data) => {
   }
 };
 
-export const removeCollection = async (id) => {
+export const removeCollection = async (user, id) => {
   try {
-    await set(ref(database, "collections/" + id), null);
+    await set(ref(database, user + "/" + id), null);
 
     return true;
   } catch (error) {
@@ -121,9 +184,9 @@ export const removeCollection = async (id) => {
   }
 };
 
-export const removeAd = async (collection, image) => {
+export const removeAd = async (user, collection, image) => {
   try {
-    const r = fRef(storage, collection + "/" + image);
+    const r = fRef(storage, user + "/" + collection + "/" + image);
 
     await deleteObject(r);
 
