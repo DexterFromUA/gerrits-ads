@@ -11,17 +11,18 @@ import {
 
 const Category = () => {
   const { id } = useParams();
+  const uid = localStorage.getItem('gUId')
 
   const inputRef = React.useRef(null);
   const [collection, setCollection] = React.useState(null);
   const [newFile, setNewFile] = React.useState(null);
 
   React.useEffect(() => {
-    handleCollection(id);
-  }, [id]);
+    handleCollection();
+  }, []);
 
-  const handleCollection = async (colName) => {
-    const data = await getSingleCollection(colName);
+  const handleCollection = async () => {
+    const data = await getSingleCollection(uid, id);
 
     if (data) {
       setCollection({ ...data });
@@ -36,9 +37,9 @@ const Category = () => {
 
   const handleAddFile = async () => {
     if (newFile) {
-      await addFileToStorage(id, newFile, (url, fileName) => {
+      await addFileToStorage(uid, id, newFile, (url, fileName) => {
         if (url) {
-          updateCollection(id, {
+          updateCollection(uid, id, {
             ...collection,
             data: collection?.data ? [...collection.data, [url, fileName]] : [[url, fileName]],
           });
@@ -57,12 +58,12 @@ const Category = () => {
   };
 
   const handleRemovingAd = async (fileName, index) => {
-    const result = await removeAd(id, fileName)
+    const result = await removeAd(uid, id, fileName)
 
     if (result) {
       const newData = collection.data.filter((_, i) => i !== index)
 
-      updateCollection(id, {
+      updateCollection(uid, id, {
         ...collection,
         data: [...newData]
       });
