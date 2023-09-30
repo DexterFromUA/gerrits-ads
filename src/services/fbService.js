@@ -83,11 +83,12 @@ export const getCollections = async (user) => {
   }
 };
 
-export const addCollection = async (user, name, description) => {
+export const addCollection = async (user, name, description, key) => {
   try {
     await set(ref(database, user + "/" + name), {
       name,
       description,
+      key,
       dateAdded: new Date().toDateString(),
     });
 
@@ -161,9 +162,9 @@ export const updateCollection = async (user, id, data) => {
   }
 };
 
-export const removeCollection = async (user, id) => {
+export const removeCollection = async (user, collection) => {
   try {
-    await set(ref(database, user + "/" + id), null);
+    await set(ref(database, user + "/" + collection), null);
 
     return true;
   } catch (error) {
