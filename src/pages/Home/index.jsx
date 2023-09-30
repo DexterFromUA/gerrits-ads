@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-import { addCollection, getCollections, signOutUser } from "../../api";
+import { addCollection, getCollections, signOutUser } from "../../services/fbService";
 import preview from '../../images/preview.jpg'
 
 const Home = () => {
