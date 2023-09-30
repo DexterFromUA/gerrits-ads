@@ -1,40 +1,17 @@
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getDatabase, ref, set, get, child, update } from "firebase/database";
 import {
-  getStorage,
-  uploadBytesResumable,
-  getDownloadURL,
-  ref as fRef,
-  deleteObject,
-  listAll,
-} from "firebase/storage";
-import {
-  getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
+import { ref, set, get, child, update } from "firebase/database";
+import {
+  uploadBytesResumable,
+  getDownloadURL,
+  ref as fRef,
+  deleteObject,
+} from "firebase/storage";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDzmANVAN9nOvntVb9YYDCb8rRzOl4M4dg",
-  authDomain: "darts-884de.firebaseapp.com",
-  databaseURL:
-    "https://darts-884de-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "darts-884de",
-  storageBucket: "darts-884de.appspot.com",
-  messagingSenderId: "508689001682",
-  appId: "1:508689001682:web:1cac2ef11591dfd27b110b",
-  measurementId: "G-R50PL9H5G4",
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
-const database = getDatabase(app);
-const storage = getStorage(app);
-const auth = getAuth(app);
+import { auth, database, storage } from "../api/fb";
 
 export const signUpManually = async (mail, pass) => {
   try {
@@ -135,30 +112,40 @@ export const getSingleCollection = async (user, name) => {
 };
 
 export const addFileToStorage = async (user, id, file, cb) => {
-  try {
-    const storageRef = fRef(storage, `${user}/${id}/${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+  if (file.length) {
+    const promises = [];
+    const urls = [];
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const percent = Math.round(
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        );
+    file.forEach((image) => {
+      const storageRef = fRef(storage, `${user}/${id}/${image.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, image);
 
-        console.log("PERCENTS", percent);
-      },
-      (err) => {
-        console.log(err);
-      },
-      () => {
-        getDownloadURL(uploadTask.snapshot.ref).then((url) => {
-          cb(url, file.name);
-        });
-      }
-    );
-  } catch (error) {
-    console.log("Error while adding file: ", error);
+      promises.push(uploadTask);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const percent = Math.round(
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+          );
+
+          console.log("PERCENTS", percent);
+        },
+        (err) => {
+          console.log(err);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((url) => {
+            console.log("downloaded", url);
+            cb(url, image.name);
+          });
+        }
+      );
+    });
+
+    Promise.all(promises)
+      .then(() => console.log("URLs from promises", urls))
+      .catch(() => console.log("Error while uploading files"));
   }
 };
 

@@ -1,7 +1,8 @@
 import React from "react";
 
-import { signUpManually, signInManually } from "../../api";
 import { useNavigate } from "react-router-dom";
+
+import { signUpManually, signInManually } from "../../services/fbService";
 
 const Login = () => {
   const navigate = useNavigate();
