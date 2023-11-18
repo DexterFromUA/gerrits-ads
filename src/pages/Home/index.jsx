@@ -76,16 +76,19 @@ const Home = () => {
           if (collection.location) {
             return {
               ...prevState,
-              collectionsWithLocations: [
-                ...prevState.collectionsWithLocations,
-                {
-                  name: collection.title,
-                  description: collection?.description ?? "",
-                  key: collection.key,
-                  location: collection.location,
-                  dateAdded: new Date().toDateString(),
-                },
-              ],
+              collectionsWithLocations: [...prevState.collectionsWithLocations.map((arr) => {
+                if (arr[0] === collection.location) {
+                  return [arr[0], [...arr[1], {
+                    name: collection.title,
+                    description: collection?.description ?? "",
+                    key: collection.key,
+                    location: collection.location,
+                    dateAdded: new Date().toDateString(),
+                  }]]
+                } else {
+                  return arr
+                }
+              })],
             };
           } else {
             return {
@@ -128,11 +131,15 @@ const Home = () => {
           return {
             ...prevState,
             collectionsWithLocations: [
-              ...prevState.collectionsWithLocations.filter(
-                ({ name }) => name !== collection
-              ),
-            ],
-          };
+              ...prevState.collectionsWithLocations.map(arr => {
+                if (location === arr[0]) {
+                  return [arr[0], [...arr[1].filter(({ name }) => name !== collection)]]
+                } else {
+                  return [...arr]
+                }
+              })
+            ]
+          }
         } else {
           return {
             ...prevState,
