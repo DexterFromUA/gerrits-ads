@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import {
   addCollection,
-  getCollections,
   getCollectionsWithLocations,
   getCollectionsWithoutLocations,
   signOutUser,
@@ -74,22 +73,37 @@ const Home = () => {
       if (result) {
         setData((prevState) => {
           if (collection.location) {
-            return {
-              ...prevState,
-              collectionsWithLocations: [...prevState.collectionsWithLocations.map((arr) => {
-                if (arr[0] === collection.location) {
-                  return [arr[0], [...arr[1], {
-                    name: collection.title,
-                    description: collection?.description ?? "",
-                    key: collection.key,
-                    location: collection.location,
-                    dateAdded: new Date().toDateString(),
-                  }]]
-                } else {
-                  return arr
-                }
-              })],
-            };
+            const selectedArray = prevState.collectionsWithLocations.filter((arr) => arr[0] === collection.location)
+
+            if (selectedArray.length) {
+              return {
+                ...prevState,
+                collectionsWithLocations: [...prevState.collectionsWithLocations.map((arr) => {
+                  if (arr[0] === collection.location) {
+                    return [arr[0], [...arr[1], {
+                      name: collection.title,
+                      description: collection?.description ?? "",
+                      key: collection.key,
+                      location: collection.location,
+                      dateAdded: new Date().toDateString(),
+                    }]]
+                  } else {
+                    return arr
+                  }
+                })],
+              }
+            } else {
+              return {
+                ...prevState,
+                collectionsWithLocations: [...prevState.collectionsWithLocations, [collection.location, [{
+                  name: collection.title,
+                  description: collection?.description ?? "",
+                  key: collection.key,
+                  location: collection.location,
+                  dateAdded: new Date().toDateString(),
+                }]]],
+              };
+            }
           } else {
             return {
               ...prevState,
