@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { AdImage } from "../../components";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../../services/fbService";
 
 const Category = () => {
-  const { id } = useParams();
+  const { state: { collectionName, withLocation, location } } = useLocation();
   const uid = localStorage.getItem("gUId");
 
   const inputRef = React.useRef(null);
@@ -22,7 +22,7 @@ const Category = () => {
   }, []);
 
   const handleCollection = async () => {
-    const data = await getSingleCollection(uid, id);
+    const data = await getSingleCollection(uid, collectionName, withLocation, location);
 
     if (data) {
       setCollection({ ...data });
@@ -45,12 +45,12 @@ const Category = () => {
     if (newFile.length) {
       const files = []
 
-      await addFileToStorage(uid, id, newFile, (url, fileName) => {
+      await addFileToStorage(uid, collectionName, withLocation ? location : null, newFile, (url, fileName) => {
         if (url) {
           files.push([url, fileName])
 
           if (files.length === newFile.length) {
-            updateCollection(uid, id, {
+            updateCollection(uid, collectionName, withLocation ? location : null, {
               ...collection,
               data: collection?.data ? [...collection.data, ...files] : [...files],
             });
@@ -70,12 +70,12 @@ const Category = () => {
   };
 
   const handleRemovingAd = async (fileName, index) => {
-    const result = await removeAd(uid, id, fileName);
+    const result = await removeAd(uid, collectionName, withLocation ? location : null, fileName);
 
     if (result) {
       const newData = collection.data.filter((_, i) => i !== index);
 
-      updateCollection(uid, id, {
+      updateCollection(uid, collectionName, withLocation ? location : null, {
         ...collection,
         data: [...newData],
       });
@@ -106,16 +106,21 @@ const Category = () => {
           flex: 1,
           flexDirection: "row",
           alignItems: "center",
-          justifyContent: "space-around",
+          justifyContent: "space-between",
           width: "100%",
         }}
       >
-        <div>
-          <h1>{collection.name}</h1>
+        <div style={{ marginLeft: 100 }}>
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+            <h1>{collection.name}</h1> {collection?.location && <h4 style={{ marginLeft: 10, marginBottom: 15 }}>for <i>{collection.location}</i></h4>}
+          </div>
+
           <h3>{collection.description}</h3>
         </div>
 
-        <div>
+        <div style={{ marginRight: 100 }}>
+          <i style={{ marginRight: 30 }}>key: {collection.key}</i>
+
           <input
             type="file"
             multiple

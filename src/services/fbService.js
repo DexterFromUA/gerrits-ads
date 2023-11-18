@@ -83,11 +83,53 @@ export const getCollections = async (user) => {
   }
 };
 
-export const addCollection = async (user, name, description) => {
+export const getCollectionsWithLocations = async (user) => {
   try {
-    await set(ref(database, user + "/" + name), {
+    const result = await get(child(ref(database), user + "/locations"));
+
+    if (result.exists()) {
+      return Object.entries(result.val()).map((el) => el[1]);
+    }
+
+    return [];
+  } catch (error) {
+    console.log("Error while getting collections: ", error);
+  }
+};
+
+export const getCollectionsWithoutLocations = async (user) => {
+  try {
+    const result = await get(child(ref(database), user + "/withoutLocations"));
+
+    if (result.exists()) {
+      return Object.entries(result.val()).map((el) => el[1]);
+    }
+
+    return [];
+  } catch (error) {
+    console.log("Error while getting collections: ", error);
+  }
+};
+
+export const addCollection = async (
+  user,
+  name,
+  description,
+  key,
+  location,
+  coordinates
+) => {
+  try {
+    const path = `${user}/${
+      location ? `locations/${location}/${name}` : `withoutLocations/${name}`
+    }`;
+
+    await set(ref(database, path), {
       name,
       description,
+      key,
+      location,
+      coordinates,
       dateAdded: new Date().toDateString(),
     });
 
@@ -97,9 +139,21 @@ export const addCollection = async (user, name, description) => {
   }
 };
 
-export const getSingleCollection = async (user, name) => {
+export const getSingleCollection = async (
+  user,
+  name,
+  withLocation,
+  location
+) => {
   try {
-    const result = await get(child(ref(database), user + "/" + name));
+    const path =
+      user +
+      "/" +
+      `${withLocation ? `locations/${location}` : "withoutLocations"}` +
+      "/" +
+      name;
+
+    const result = await get(child(ref(database), path));
 
     if (result.exists()) {
       return result.val();
@@ -111,13 +165,16 @@ export const getSingleCollection = async (user, name) => {
   }
 };
 
-export const addFileToStorage = async (user, id, file, cb) => {
+export const addFileToStorage = async (user, id, location = null, file, cb) => {
   if (file.length) {
     const promises = [];
     const urls = [];
 
     file.forEach((image) => {
-      const storageRef = fRef(storage, `${user}/${id}/${image.name}`);
+      const path = location
+        ? `${user}/locations/${location}/${id}/${image.name}`
+        : `${user}/withoutLocations/${id}/${image.name}`;
+      const storageRef = fRef(storage, path);
       const uploadTask = uploadBytesResumable(storageRef, image);
 
       promises.push(uploadTask);
@@ -149,10 +206,13 @@ export const addFileToStorage = async (user, id, file, cb) => {
   }
 };
 
-export const updateCollection = async (user, id, data) => {
+export const updateCollection = async (user, id, location = null, data) => {
   const updates = {};
+  const path = location
+    ? user + "/locations/" + location + "/" + id
+    : user + "/withoutLocations/" + id;
 
-  updates[user + "/" + id] = data;
+  updates[path] = data;
 
   try {
     await update(ref(database), updates);
@@ -161,9 +221,12 @@ export const updateCollection = async (user, id, data) => {
   }
 };
 
-export const removeCollection = async (user, id) => {
+export const removeCollection = async (user, collection, location) => {
   try {
-    await set(ref(database, user + "/" + id), null);
+    const path = location
+      ? user + "/locations/" + location + "/" + collection
+      : user + "/withoutLocations/" + collection;
+    await set(ref(database, path), null);
 
     return true;
   } catch (error) {
@@ -171,9 +234,12 @@ export const removeCollection = async (user, id) => {
   }
 };
 
-export const removeAd = async (user, collection, image) => {
+export const removeAd = async (user, collection, location = null, image) => {
   try {
-    const r = fRef(storage, user + "/" + collection + "/" + image);
+    const path = location
+      ? user + "/locations/" + location + "/" + collection + "/" + image
+      : user + "/withoutLocations/" + collection + "/" + image;
+    const r = fRef(storage, path);
 
     await deleteObject(r);
 
