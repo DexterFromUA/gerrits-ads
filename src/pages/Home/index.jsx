@@ -7,6 +7,7 @@ import {
   getCollectionsWithoutLocations,
   signOutUser,
   removeCollection,
+  getLocationList,
 } from "../../services/fbService";
 import preview from "../../images/preview.jpg";
 import { Collection, CollectionWithInputs } from "../../components";
@@ -20,6 +21,7 @@ const Home = () => {
   const [addingProcess, setAddingProcess] = React.useState(false);
   const [data, setData] = React.useState(null);
   const [collection, setCollection] = React.useState({});
+  const [locationList, setLocationList] = React.useState([])
 
   React.useEffect(() => {
     init();
@@ -29,6 +31,9 @@ const Home = () => {
     const user = localStorage.getItem("gUId");
 
     if (user) {
+      const list = await getLocationList(user)
+      setLocationList([...list])
+
       const collectionsWithLocations = await getCollectionsWithLocations(user);
       const collectionsWithoutLocations = await getCollectionsWithoutLocations(
         user
@@ -69,6 +74,10 @@ const Home = () => {
         collection?.location ?? null,
         null
       );
+
+      if (collection?.location && !locationList.includes(collection.location)) {
+        setLocationList(prevState => [...prevState, collection.location])
+      }
 
       if (result) {
         setData((prevState) => {
@@ -247,6 +256,7 @@ const Home = () => {
           item={collection}
           onChange={setCollection}
           onAdd={handleAddNewCollection}
+          list={locationList}
         />
       )}
 

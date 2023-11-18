@@ -248,3 +248,17 @@ export const removeAd = async (user, collection, location = null, image) => {
     console.log("Error while removing ad: ", error);
   }
 };
+
+export const getLocationList = async (user) => {
+  try {
+    const result = await get(child(ref(database), user + "/locations"));
+
+    if (result.exists()) {
+      return Object.entries(result.val()).map((el) => el[0]);
+    }
+
+    return [];
+  } catch (error) {
+    console.log("Error while getting collections: ", error);
+  }
+};

@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default ({ image, item, onChange, onAdd }) => {
+export default ({ image, item, onChange, onAdd, list }) => {
   return (
     <div
       style={{
@@ -64,11 +64,15 @@ export default ({ image, item, onChange, onAdd }) => {
           />
 
           <input
+            list="browsers" name="myBrowser"
             placeholder="The location of your collection"
             value={item?.location ?? ''}
             onChange={(e) => onChange(prevState => ({ ...prevState, location: e.target.value }))}
             style={{ marginBottom: 10 }}
           />
+          <datalist id="browsers">
+            {list && list.length > 0 && list.map(el => <option key={el} value={el} />)}
+          </datalist>
         </div>
 
         <div style={{ marginRight: 15, cursor: 'pointer' }} onClick={onAdd}>+</div>
