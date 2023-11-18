@@ -1,9 +1,16 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-import { addCollection, getCollections, signOutUser, removeCollection } from "../../services/fbService";
-import preview from '../../images/preview.jpg'
-import { SettingButton } from "../../components";
+import {
+  addCollection,
+  getCollections,
+  getCollectionsWithLocations,
+  getCollectionsWithoutLocations,
+  signOutUser,
+  removeCollection,
+} from "../../services/fbService";
+import preview from "../../images/preview.jpg";
+import { Collection, CollectionWithInputs } from "../../components";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -12,10 +19,8 @@ const Home = () => {
 
   const [loading, setLoading] = React.useState(true);
   const [addingProcess, setAddingProcess] = React.useState(false);
-  const [collectionName, setCollectionName] = React.useState("");
-  const [collectionDescription, setCollectionDescription] = React.useState("");
-  const [collectionKey, setCollectionKey] = React.useState("");
-  const [data, setData] = React.useState([]);
+  const [data, setData] = React.useState(null);
+  const [collection, setCollection] = React.useState({});
 
   React.useEffect(() => {
     init();
@@ -25,9 +30,30 @@ const Home = () => {
     const user = localStorage.getItem("gUId");
 
     if (user) {
-      const collections = await getCollections(user);
+      const collectionsWithLocations = await getCollectionsWithLocations(user);
+      const collectionsWithoutLocations = await getCollectionsWithoutLocations(
+        user
+      );
 
-      setData([...collections]);
+      const collectionMap = new Map();
+
+      collectionsWithLocations
+        .map((item) => Object.values(item))
+        .flat(1)
+        .forEach((el) => {
+          if (collectionMap.has(el.location)) {
+            const items = collectionMap.get(el.location)
+
+            collectionMap.set(el.location, [...items, { ...el }])
+          } else {
+            collectionMap.set(el.location, [el])
+          }
+        });
+
+      setData({
+        collectionsWithLocations: [...Array.from(collectionMap)],
+        collectionsWithoutLocations: [...collectionsWithoutLocations],
+      });
       setLoading(false);
     } else {
       navigate("/login");
@@ -35,27 +61,49 @@ const Home = () => {
   };
 
   const handleAddNewCollection = async () => {
-    if (collectionName && collectionKey) {
+    if (collection?.title && collection?.key) {
       const result = await addCollection(
         uid,
-        collectionName,
-        collectionDescription,
-        collectionKey
+        collection.title,
+        collection?.description ?? "",
+        collection.key,
+        collection?.location ?? null,
+        null
       );
 
       if (result) {
-        setData((prevState) => [
-          ...prevState,
-          {
-            name: collectionName,
-            description: collectionDescription,
-            key: collectionKey,
-            dateAdded: new Date().toDateString(),
-          },
-        ]);
-        setCollectionName("");
-        setCollectionDescription("");
-        setCollectionKey("");
+        setData((prevState) => {
+          if (collection.location) {
+            return {
+              ...prevState,
+              collectionsWithLocations: [
+                ...prevState.collectionsWithLocations,
+                {
+                  name: collection.title,
+                  description: collection?.description ?? "",
+                  key: collection.key,
+                  location: collection.location,
+                  dateAdded: new Date().toDateString(),
+                },
+              ],
+            };
+          } else {
+            return {
+              ...prevState,
+              collectionsWithoutLocations: [
+                ...prevState.collectionsWithoutLocations,
+                {
+                  name: collection.title,
+                  description: collection?.description ?? "",
+                  key: collection.key,
+                  location: null,
+                  dateAdded: new Date().toDateString(),
+                },
+              ],
+            };
+          }
+        });
+        setCollection({});
         setAddingProcess(false);
       }
     }
@@ -71,13 +119,29 @@ const Home = () => {
     console.log("edit");
   };
 
-  const handleRemove = async (collection) => {
-    const result = await removeCollection(uid, collection);
+  const handleRemove = async (collection, location) => {
+    const result = await removeCollection(uid, collection, location);
 
     if (result) {
       setData((prevState) => {
-        if (prevState.length) {
-          return prevState.filter(({ name }) => name !== collection);
+        if (location) {
+          return {
+            ...prevState,
+            collectionsWithLocations: [
+              ...prevState.collectionsWithLocations.filter(
+                ({ name }) => name !== collection
+              ),
+            ],
+          };
+        } else {
+          return {
+            ...prevState,
+            collectionsWithoutLocations: [
+              ...prevState.collectionsWithoutLocations.filter(
+                ({ name }) => name !== collection
+              ),
+            ],
+          };
         }
       });
     }
@@ -133,7 +197,7 @@ const Home = () => {
             justifyContent: "space-around",
           }}
         >
-          <h1>Ads admin</h1>
+          <h1>Ads Admin Panel</h1>
         </div>
 
         <div
@@ -141,120 +205,132 @@ const Home = () => {
             display: "flex",
             flex: 1,
             alignItems: "center",
-            justifyContent: "space-around",
+            justifyContent: "flex-end",
           }}
         >
-          <button onClick={handleSignOut}>Sign Out</button>
+          <button
+            onClick={() => setAddingProcess((prevState) => !prevState)}
+            style={{ marginRight: 20 }}
+          >
+            {addingProcess ? "Adding in process.." : "Add Collection"}
+          </button>
+          <button onClick={handleSignOut} style={{ marginRight: 20 }}>
+            Sign Out
+          </button>
         </div>
       </div>
-
-      <div style={{ flex: 1, marginTop: 100, width: 500 }}>
-        {data &&
-          data.map((el, i) => (
-            <div
-              key={i}
-              onClick={() =>
-                navigate(`collection/${el.name}`, {
-                  state: {
-                    collection: el.name,
-                  },
-                })
-              }
-              style={{
-                display: "flex",
-                border: "1px solid black",
-                flexDirection: "row",
-                alignItems: "center",
-                borderRadius: 15,
-                marginBottom: 10,
-                cursor: "pointer",
-                justifyContent: "space-between",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <div
-                  style={{
-                    marginRight: 50,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: 10,
-                  }}
-                >
-                  <img
-                    src={preview}
-                    width={100}
-                    height={100}
-                    content="contain"
-                    alt="preview"
-                  />
-                </div>
-
-                <div>
-                  <h4>{el.name}</h4>
-
-                  <h6>{el.description}</h6>
-                </div>
-              </div>
-
-              <SettingButton
-                list={[
-                  { text: "Edit", onClick: handleEdit },
-                  {
-                    text: "Remove",
-                    onClick: () => handleRemove(el.name),
-                    style: { color: "red" },
-                  },
-                ]}
-              />
-            </div>
-          ))}
-      </div>
-
-      {!addingProcess && (
-        <div
-          onClick={() => setAddingProcess((prevState) => !prevState)}
-          style={{
-            cursor: "pointer",
-            display: "flex",
-            alignSelf: "center",
-            justifySelf: "center",
-            width: "auto",
-            border: "1px solid green",
-            padding: 10,
-            borderRadius: 10,
-          }}
-        >
-          Add new Collection
-        </div>
-      )}
 
       {addingProcess && (
-        <div>
-          <input
-            placeholder="Collection name"
-            value={collectionName}
-            onChange={(e) => setCollectionName(e.target.value)}
-          />
-          <input
-            placeholder="Collection description"
-            value={collectionDescription}
-            onChange={(e) => setCollectionDescription(e.target.value)}
-          />
-          <input
-            placeholder="Collection Key"
-            value={collectionKey}
-            onChange={(e) => setCollectionKey(e.target.value)}
-          />
-          <button onClick={handleAddNewCollection}>add</button>
-        </div>
+        <CollectionWithInputs
+          image={preview}
+          item={collection}
+          onChange={setCollection}
+          onAdd={handleAddNewCollection}
+        />
       )}
+
+      {data &&
+        data.collectionsWithLocations &&
+        data.collectionsWithLocations.length > 0 && data.collectionsWithLocations.map(([title, item], i) => <div key={i}
+          style={{
+            display: "flex",
+            flex: 1,
+            width: "90%",
+            marginTop: 50,
+            flexDirection: "column",
+          }}
+        >
+          <h4>{title}</h4>
+          <div
+            style={{
+              display: "flex",
+              flex: 1,
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            {item && item.length > 0 ? item.map(
+              ({ name, description, location, data }, i) => (
+                <Collection
+                  key={i + name}
+                  name={name}
+                  description={description}
+                  onPress={() =>
+                    navigate(`collection/${name}`, {
+                      state: {
+                        collectionName: name,
+                        withLocation: true,
+                        location,
+                      },
+                    })
+                  }
+                  image={data && data.length > 0 ? data[0][0] : preview}
+                  buttonList={[
+                    { text: "Edit", onClick: handleEdit },
+                    {
+                      text: "Remove",
+                      onClick: () => handleRemove(name, location),
+                      style: { color: "red" },
+                    },
+                  ]}
+                />
+              )
+            ) : <div>Empty collection</div>}
+          </div>
+        </div>)}
+
+      {data &&
+        data.collectionsWithoutLocations &&
+        data.collectionsWithoutLocations.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flex: 1,
+              width: "90%",
+              marginTop: 100,
+              flexDirection: "column",
+            }}
+          >
+            <h4>Without location</h4>
+            <div
+              style={{
+                display: "flex",
+                flex: 1,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              {data.collectionsWithoutLocations.map(
+                ({ name, description, data }, i) => (
+                  <Collection
+                    key={i}
+                    name={name}
+                    description={description}
+                    onPress={() =>
+                      navigate(`collection/${name}`, {
+                        state: {
+                          collectionName: name,
+                          withLocation: false,
+                        },
+                      })
+                    }
+                    image={data && data.length > 0 ? data[0][0] : preview}
+                    buttonList={[
+                      { text: "Edit", onClick: handleEdit },
+                      {
+                        text: "Remove",
+                        onClick: () => handleRemove(name),
+                        style: { color: "red" },
+                      },
+                    ]}
+                  />
+                )
+              )}
+            </div>
+          </div>
+        )}
     </div>
   );
 };
