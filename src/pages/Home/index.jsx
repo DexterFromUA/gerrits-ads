@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useAlert } from "react-alert";
 
 import {
   addCollection,
@@ -8,12 +9,15 @@ import {
   signOutUser,
   removeCollection,
   getLocationList,
+  getKeyList,
 } from "../../services/fbService";
 import preview from "../../images/preview.jpg";
 import { Collection, CollectionWithInputs } from "../../components";
+import mapToKeyList from "../../utils/mapToKeyList";
 
 const Home = () => {
   const navigate = useNavigate();
+  const alert = useAlert();
   const user = localStorage.getItem("gMail");
   const uid = localStorage.getItem("gUId");
 
@@ -21,7 +25,8 @@ const Home = () => {
   const [addingProcess, setAddingProcess] = React.useState(false);
   const [data, setData] = React.useState(null);
   const [collection, setCollection] = React.useState({});
-  const [locationList, setLocationList] = React.useState([])
+  const [locationList, setLocationList] = React.useState([]);
+  const [keyList, setKeyList] = React.useState(new Map());
 
   React.useEffect(() => {
     init();
@@ -31,34 +36,42 @@ const Home = () => {
     const user = localStorage.getItem("gUId");
 
     if (user) {
-      const list = await getLocationList(user)
-      setLocationList([...list])
+      try {
+        const list = await getLocationList(user);
+        setLocationList([...list]);
 
-      const collectionsWithLocations = await getCollectionsWithLocations(user);
-      const collectionsWithoutLocations = await getCollectionsWithoutLocations(
-        user
-      );
+        const keys = await getKeyList(user);
+        setKeyList(keys);
 
-      const collectionMap = new Map();
+        const collectionsWithLocations = await getCollectionsWithLocations(user);
+        const collectionsWithoutLocations = await getCollectionsWithoutLocations(
+          user
+        );
 
-      collectionsWithLocations
-        .map((item) => Object.values(item))
-        .flat(1)
-        .forEach((el) => {
-          if (collectionMap.has(el.location)) {
-            const items = collectionMap.get(el.location)
+        const collectionMap = new Map();
 
-            collectionMap.set(el.location, [...items, { ...el }])
-          } else {
-            collectionMap.set(el.location, [el])
-          }
+        collectionsWithLocations
+          .map((item) => Object.values(item))
+          .flat(1)
+          .forEach((el) => {
+            if (collectionMap.has(el.location)) {
+              const items = collectionMap.get(el.location);
+
+              collectionMap.set(el.location, [...items, { ...el }]);
+            } else {
+              collectionMap.set(el.location, [el]);
+            }
+          });
+
+        setData({
+          collectionsWithLocations: [...Array.from(collectionMap)],
+          collectionsWithoutLocations: [...collectionsWithoutLocations],
         });
-
-      setData({
-        collectionsWithLocations: [...Array.from(collectionMap)],
-        collectionsWithoutLocations: [...collectionsWithoutLocations],
-      });
-      setLoading(false);
+        setLoading(false);
+      } catch (error) {
+        alert.error(error)
+        throw new Error(error)
+      }
     } else {
       navigate("/login");
     }
@@ -76,41 +89,91 @@ const Home = () => {
       );
 
       if (collection?.location && !locationList.includes(collection.location)) {
-        setLocationList(prevState => [...prevState, collection.location])
+        setLocationList((prevState) => [...prevState, collection.location]);
+      }
+
+      if (
+        keyList &&
+        keyList
+          .get(collection.location ? collection.location : "withoutLocation")
+          ?.includes(collection.key)
+      ) {
+        alert.error('There is already a similar key in this location')
+        return;
+      } else {
+        setKeyList((prevState) => {
+          if (collection.location) {
+            if (prevState.has(collection.location)) {
+              return prevState.set(collection.location, [
+                ...prevState.get(collection.location),
+                collection.key,
+              ]);
+            } else {
+              return prevState.set(collection.location, [collection.key]);
+            }
+          } else {
+            return prevState.set(
+              "withoutLocation",
+              prevState.get(collection.location)
+                ? [...prevState.get("withoutLocation"), collection.key]
+                : [collection.key]
+            );
+          }
+        });
       }
 
       if (result) {
+        alert.success('New collection added successfully')
+
         setData((prevState) => {
           if (collection.location) {
-            const selectedArray = prevState.collectionsWithLocations.filter((arr) => arr[0] === collection.location)
+            const selectedArray = prevState.collectionsWithLocations.filter(
+              (arr) => arr[0] === collection.location
+            );
 
             if (selectedArray.length) {
               return {
                 ...prevState,
-                collectionsWithLocations: [...prevState.collectionsWithLocations.map((arr) => {
-                  if (arr[0] === collection.location) {
-                    return [arr[0], [...arr[1], {
-                      name: collection.title,
-                      description: collection?.description ?? "",
-                      key: collection.key,
-                      location: collection.location,
-                      dateAdded: new Date().toDateString(),
-                    }]]
-                  } else {
-                    return arr
-                  }
-                })],
-              }
+                collectionsWithLocations: [
+                  ...prevState.collectionsWithLocations.map((arr) => {
+                    if (arr[0] === collection.location) {
+                      return [
+                        arr[0],
+                        [
+                          ...arr[1],
+                          {
+                            name: collection.title,
+                            description: collection?.description ?? "",
+                            key: collection.key,
+                            location: collection.location,
+                            dateAdded: new Date().toDateString(),
+                          },
+                        ],
+                      ];
+                    } else {
+                      return arr;
+                    }
+                  }),
+                ],
+              };
             } else {
               return {
                 ...prevState,
-                collectionsWithLocations: [...prevState.collectionsWithLocations, [collection.location, [{
-                  name: collection.title,
-                  description: collection?.description ?? "",
-                  key: collection.key,
-                  location: collection.location,
-                  dateAdded: new Date().toDateString(),
-                }]]],
+                collectionsWithLocations: [
+                  ...prevState.collectionsWithLocations,
+                  [
+                    collection.location,
+                    [
+                      {
+                        name: collection.title,
+                        description: collection?.description ?? "",
+                        key: collection.key,
+                        location: collection.location,
+                        dateAdded: new Date().toDateString(),
+                      },
+                    ],
+                  ],
+                ],
               };
             }
           } else {
@@ -132,6 +195,8 @@ const Home = () => {
         setCollection({});
         setAddingProcess(false);
       }
+    } else {
+      alert.error('Title and Key is important')
     }
   };
 
@@ -145,24 +210,29 @@ const Home = () => {
     console.log("edit");
   };
 
-  const handleRemove = async (collection, location) => {
+  const handleRemove = async (collection, key, location) => {
     const result = await removeCollection(uid, collection, location);
 
     if (result) {
+      alert.success('The collection has been removed successfully')
+
       setData((prevState) => {
         if (location) {
           return {
             ...prevState,
             collectionsWithLocations: [
-              ...prevState.collectionsWithLocations.map(arr => {
+              ...prevState.collectionsWithLocations.map((arr) => {
                 if (location === arr[0]) {
-                  return [arr[0], [...arr[1].filter(({ name }) => name !== collection)]]
+                  return [
+                    arr[0],
+                    [...arr[1].filter(({ name }) => name !== collection)],
+                  ];
                 } else {
-                  return [...arr]
+                  return [...arr];
                 }
-              })
-            ]
-          }
+              }),
+            ],
+          };
         } else {
           return {
             ...prevState,
@@ -174,6 +244,8 @@ const Home = () => {
           };
         }
       });
+    } else {
+      alert.error('Error while removing the collection')
     }
   };
 
@@ -216,7 +288,10 @@ const Home = () => {
           }}
         >
           <h4>{user}</h4>
-          <i>{uid}</i>
+          <i style={{ cursor: 'pointer' }} onClick={() => {
+            navigator.clipboard.writeText(uid)
+            alert.info('The key is copied')
+          }}>{uid}</i>
         </div>
 
         <div
@@ -257,59 +332,68 @@ const Home = () => {
           onChange={setCollection}
           onAdd={handleAddNewCollection}
           list={locationList}
+          keys={
+            keyList && mapToKeyList(keyList).length ? mapToKeyList(keyList) : []
+          }
         />
       )}
 
       {data &&
         data.collectionsWithLocations &&
-        data.collectionsWithLocations.length > 0 && data.collectionsWithLocations.map(([title, item], i) => <div key={i}
-          style={{
-            display: "flex",
-            flex: 1,
-            width: "90%",
-            marginTop: 50,
-            flexDirection: "column",
-          }}
-        >
-          <h4>{title}</h4>
+        data.collectionsWithLocations.length > 0 &&
+        data.collectionsWithLocations.map(([title, item], i) => (
           <div
+            key={i}
             style={{
               display: "flex",
               flex: 1,
-              flexDirection: "row",
-              flexWrap: "wrap",
-              alignItems: "center",
+              width: "90%",
+              marginTop: 50,
+              flexDirection: "column",
             }}
           >
-            {item && item.length > 0 ? item.map(
-              ({ name, description, location, data }, i) => (
-                <Collection
-                  key={i + name}
-                  name={name}
-                  description={description}
-                  onPress={() =>
-                    navigate(`collection/${name}`, {
-                      state: {
-                        collectionName: name,
-                        withLocation: true,
-                        location,
+            <h4>{title}</h4>
+            <div
+              style={{
+                display: "flex",
+                flex: 1,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              {item && item.length > 0 ? (
+                item.map(({ name, description, location, data, key }, i) => (
+                  <Collection
+                    key={i + name}
+                    name={name}
+                    description={description}
+                    onPress={() =>
+                      navigate(`collection/${name}`, {
+                        state: {
+                          collectionName: name,
+                          withLocation: true,
+                          location,
+                        },
+                      })
+                    }
+                    image={data && data.length > 0 ? data[0][0] : preview}
+                    buttonList={[
+                      { text: "Edit", onClick: handleEdit },
+                      {
+                        text: "Remove",
+                        onClick: () => handleRemove(name, key, location),
+                        style: { color: "red" },
                       },
-                    })
-                  }
-                  image={data && data.length > 0 ? data[0][0] : preview}
-                  buttonList={[
-                    { text: "Edit", onClick: handleEdit },
-                    {
-                      text: "Remove",
-                      onClick: () => handleRemove(name, location),
-                      style: { color: "red" },
-                    },
-                  ]}
-                />
-              )
-            ) : <div>Empty collection</div>}
+                    ]}
+                  />
+                ))
+              ) : (
+                <div>Empty collection</div>
+              )}
+            </div>
           </div>
-        </div>)}
+        ))}
 
       {data &&
         data.collectionsWithoutLocations &&
@@ -334,7 +418,7 @@ const Home = () => {
               }}
             >
               {data.collectionsWithoutLocations.map(
-                ({ name, description, data }, i) => (
+                ({ name, description, data, key }, i) => (
                   <Collection
                     key={i}
                     name={name}
@@ -352,7 +436,7 @@ const Home = () => {
                       { text: "Edit", onClick: handleEdit },
                       {
                         text: "Remove",
-                        onClick: () => handleRemove(name),
+                        onClick: () => handleRemove(name, key),
                         style: { color: "red" },
                       },
                     ]}

@@ -262,3 +262,35 @@ export const getLocationList = async (user) => {
     console.log("Error while getting collections: ", error);
   }
 };
+
+export const getKeyList = async (user) => {
+  try {
+    const keyCollection = new Map();
+    const locationsResult = await get(
+      child(ref(database), user + "/locations")
+    );
+    const withoutLocationsResult = await get(
+      child(ref(database), user + "/withoutLocations")
+    );
+
+    if (locationsResult.exists()) {
+      Object.entries(locationsResult.val()).forEach(([location, obj]) => {
+        keyCollection.set(
+          location,
+          Object.values(obj).map((el) => el.key)
+        );
+      });
+    }
+
+    if (withoutLocationsResult.exists()) {
+      keyCollection.set(
+        "withoutLocation",
+        Object.values(withoutLocationsResult.val()).map((el) => el.key)
+      );
+    }
+
+    return keyCollection;
+  } catch (error) {
+    console.log("Error while getting key list: ", error);
+  }
+};

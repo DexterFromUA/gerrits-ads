@@ -1,5 +1,6 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
+import { useAlert } from "react-alert";
 
 import { AdImage } from "../../components";
 import {
@@ -12,6 +13,7 @@ import {
 const Category = () => {
   const { state: { collectionName, withLocation, location } } = useLocation();
   const uid = localStorage.getItem("gUId");
+  const alert = useAlert()
 
   const inputRef = React.useRef(null);
   const [collection, setCollection] = React.useState(null);
@@ -26,6 +28,8 @@ const Category = () => {
 
     if (data) {
       setCollection({ ...data });
+    } else {
+      alert.error('Error while getting the collection data')
     }
   };
 
@@ -84,6 +88,8 @@ const Category = () => {
         ...prevState,
         data: [...newData],
       }));
+    } else {
+      alert.error('Error while removing an ad')
     }
   };
 
@@ -119,7 +125,10 @@ const Category = () => {
         </div>
 
         <div style={{ marginRight: 100 }}>
-          <i style={{ marginRight: 30 }}>key: {collection.key}</i>
+          <i style={{ marginRight: 30 }}>key: <b style={{ cursor: 'pointer' }} onClick={() => {
+            navigator.clipboard.writeText(collection.key)
+            alert.info('The key is copied')
+          }}>{collection.key}</b></i>
 
           <input
             type="file"
