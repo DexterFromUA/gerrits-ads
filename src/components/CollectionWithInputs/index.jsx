@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default ({ image, item, onChange, onAdd, list }) => {
+export default ({ image, item, onChange, onAdd, list, keys }) => {
   return (
     <div
       style={{
@@ -57,11 +57,15 @@ export default ({ image, item, onChange, onAdd, list }) => {
           />
 
           <input
+            list="keys" name="myBrowserKeys"
             placeholder="The API key of your collection. Needed for getting collection in your app. Required"
             value={item?.key ?? ''}
             onChange={(e) => onChange(prevState => ({ ...prevState, key: e.target.value }))}
             style={{ border: "1px solid red", marginBottom: 10 }}
           />
+          <datalist id="keys">
+            {keys && keys.length > 0 && keys.map(el => <option key={el} value={el} />)}
+          </datalist>
 
           <input
             list="browsers" name="myBrowser"
