@@ -1,62 +1,31 @@
 import React from 'react'
-
-import SettingButton from '../SettingButton'
+import { Card, CardActionArea, CardActions, CardContent, CardMedia, IconButton, Typography } from '@mui/material'
+import { DeleteOutline, EditOutlined } from '@mui/icons-material'
 
 export default ({ name, description, onPress, image, buttonList }) => {
   return (
-    <div
-      onClick={onPress}
-      style={{
-        display: "flex",
-        border: "1px solid black",
-        flexDirection: "row",
-        alignItems: "center",
-        borderRadius: 15,
-        marginBottom: 10,
-        cursor: "pointer",
-        justifyContent: "space-between",
-        width: '30%',
-        height: 130,
-        marginLeft: 10,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            marginRight: 50,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 10,
-          }}
-        >
-          <img
-            src={image}
-            width={100}
-            height={100}
-            alt="preview"
-            style={{
-              objectFit: 'contain'
-            }}
-          />
-        </div>
-
-        <div>
-          <h4>{name}</h4>
-
-          <h6>{description}</h6>
-        </div>
-      </div>
-
-      <SettingButton
-        list={buttonList}
-      />
-    </div >
+    <Card sx={{ width: 345, marginLeft: 4, marginBottom: 2 }} elevation={4}>
+      <CardActionArea onClick={onPress}>
+        <CardMedia
+          component="img"
+          height="200"
+          image={image}
+        />
+        <CardContent>
+          <Typography gutterBottom variant="h5" component="div">
+            {name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {description}
+          </Typography>
+        </CardContent>
+      </CardActionArea>
+      <CardActions style={{ justifyContent: 'flex-end' }}>
+        {buttonList && buttonList.length > 0 && buttonList.map(({ text, onClick }, i) => <IconButton key={i} onClick={onClick} aria-label={text}>
+          {text === 'Remove' && <DeleteOutline color='error' />}
+          {text === 'Edit' && <EditOutlined />}
+        </IconButton>)}
+      </CardActions>
+    </Card>
   )
 }

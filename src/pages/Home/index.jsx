@@ -1,6 +1,27 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAlert } from "react-alert";
+import {
+  Autocomplete,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Divider,
+  Drawer,
+  Fab,
+  IconButton,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { AddCircleOutlineOutlined, CheckCircleOutline, LogoutOutlined, SaveAsOutlined } from "@mui/icons-material";
+import { createFilterOptions } from "@mui/material/Autocomplete";
+import { green } from '@mui/material/colors';
 
 import {
   addCollection,
@@ -18,15 +39,22 @@ import mapToKeyList from "../../utils/mapToKeyList";
 const Home = () => {
   const navigate = useNavigate();
   const alert = useAlert();
+  const filter = createFilterOptions();
   const user = localStorage.getItem("gMail");
   const uid = localStorage.getItem("gUId");
 
   const [loading, setLoading] = React.useState(true);
-  const [addingProcess, setAddingProcess] = React.useState(false);
+  const [addingProcess, setAddingProcess] = React.useState({
+    opened: false,
+    loading: false,
+    error: false,
+    success: false
+  });
   const [data, setData] = React.useState(null);
   const [collection, setCollection] = React.useState({});
   const [locationList, setLocationList] = React.useState([]);
   const [keyList, setKeyList] = React.useState(new Map());
+  const [isRemoving, setIsRemoving] = React.useState(null)
 
   React.useEffect(() => {
     init();
@@ -43,10 +71,11 @@ const Home = () => {
         const keys = await getKeyList(user);
         setKeyList(keys);
 
-        const collectionsWithLocations = await getCollectionsWithLocations(user);
-        const collectionsWithoutLocations = await getCollectionsWithoutLocations(
+        const collectionsWithLocations = await getCollectionsWithLocations(
           user
         );
+        const collectionsWithoutLocations =
+          await getCollectionsWithoutLocations(user);
 
         const collectionMap = new Map();
 
@@ -69,8 +98,8 @@ const Home = () => {
         });
         setLoading(false);
       } catch (error) {
-        alert.error(error)
-        throw new Error(error)
+        alert.error(error);
+        throw new Error(error);
       }
     } else {
       navigate("/login");
@@ -78,27 +107,17 @@ const Home = () => {
   };
 
   const handleAddNewCollection = async () => {
+    setAddingProcess(prevState => ({ ...prevState, loading: true }))
+
     if (collection?.title && collection?.key) {
-      const result = await addCollection(
-        uid,
-        collection.title,
-        collection?.description ?? "",
-        collection.key,
-        collection?.location ?? null,
-        null
-      );
-
-      if (collection?.location && !locationList.includes(collection.location)) {
-        setLocationList((prevState) => [...prevState, collection.location]);
-      }
-
       if (
         keyList &&
         keyList
           .get(collection.location ? collection.location : "withoutLocation")
           ?.includes(collection.key)
       ) {
-        alert.error('There is already a similar key in this location')
+        alert.error("There is already a similar key in this location");
+
         return;
       } else {
         setKeyList((prevState) => {
@@ -122,8 +141,22 @@ const Home = () => {
         });
       }
 
+      const result = await addCollection(
+        uid,
+        collection.title,
+        collection?.description ?? "",
+        collection.key,
+        collection?.location ?? null,
+        null
+      );
+
+      if (collection?.location && !locationList.includes(collection.location)) {
+        setLocationList((prevState) => [...prevState, collection.location]);
+      }
+
       if (result) {
-        alert.success('New collection added successfully')
+        alert.success("New collection added successfully");
+        setAddingProcess(prevState => ({ ...prevState, success: true }))
 
         setData((prevState) => {
           if (collection.location) {
@@ -193,11 +226,13 @@ const Home = () => {
           }
         });
         setCollection({});
-        setAddingProcess(false);
+        setAddingProcess((prevState) => setAddingProcess({ ...prevState, opened: false }));
       }
     } else {
-      alert.error('Title and Key is important')
+      alert.error("Title and Key is important");
     }
+
+    setAddingProcess(prevState => ({ ...prevState, loading: true }))
   };
 
   const handleSignOut = async () => {
@@ -210,11 +245,12 @@ const Home = () => {
     console.log("edit");
   };
 
-  const handleRemove = async (collection, key, location) => {
+  const handleRemove = async (collection, location) => {
     const result = await removeCollection(uid, collection, location);
 
     if (result) {
-      alert.success('The collection has been removed successfully')
+      alert.success("The collection has been removed successfully");
+      setIsRemoving(null)
 
       setData((prevState) => {
         if (location) {
@@ -245,7 +281,7 @@ const Home = () => {
         }
       });
     } else {
-      alert.error('Error while removing the collection')
+      alert.error("Error while removing the collection");
     }
   };
 
@@ -260,14 +296,19 @@ const Home = () => {
           paddingTop: "50vh",
         }}
       >
-        LOADING...
+        <CircularProgress />
       </div>
     );
   }
 
   return (
     <div
-      style={{ display: "flex", alignItems: "center", flexDirection: "column" }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        flexDirection: "column",
+        marginBottom: 20,
+      }}
     >
       <div
         style={{
@@ -287,11 +328,18 @@ const Home = () => {
             justifyContent: "space-around",
           }}
         >
-          <h4>{user}</h4>
-          <i style={{ cursor: 'pointer' }} onClick={() => {
-            navigator.clipboard.writeText(uid)
-            alert.info('The key is copied')
-          }}>{uid}</i>
+          <Typography variant="h6" gutterBottom>
+            {user}
+          </Typography>
+          <i
+            style={{ cursor: "pointer" }}
+            onClick={() => {
+              navigator.clipboard.writeText(uid);
+              alert.info("The key is copied");
+            }}
+          >
+            {uid}
+          </i>
         </div>
 
         <div
@@ -300,9 +348,12 @@ const Home = () => {
             flex: 1,
             alignItems: "center",
             justifyContent: "space-around",
+            marginTop: 30,
           }}
         >
-          <h1>Ads Admin Panel</h1>
+          <Typography variant="h3" gutterBottom>
+            Ads Admin Panel
+          </Typography>
         </div>
 
         <div
@@ -313,30 +364,214 @@ const Home = () => {
             justifyContent: "flex-end",
           }}
         >
-          <button
-            onClick={() => setAddingProcess((prevState) => !prevState)}
+          <IconButton
+            onClick={(prevState) => setAddingProcess({ ...prevState, opened: true })}
+            aria-label="add"
             style={{ marginRight: 20 }}
           >
-            {addingProcess ? "Adding in process.." : "Add Collection"}
-          </button>
-          <button onClick={handleSignOut} style={{ marginRight: 20 }}>
-            Sign Out
-          </button>
+            <AddCircleOutlineOutlined color="success" />
+          </IconButton>
+          <IconButton
+            onClick={handleSignOut}
+            aria-label="logout"
+            style={{ marginRight: 20 }}
+          >
+            <LogoutOutlined />
+          </IconButton>
         </div>
       </div>
 
-      {addingProcess && (
-        <CollectionWithInputs
-          image={preview}
-          item={collection}
-          onChange={setCollection}
-          onAdd={handleAddNewCollection}
-          list={locationList}
-          keys={
-            keyList && mapToKeyList(keyList).length ? mapToKeyList(keyList) : []
-          }
-        />
-      )}
+      <Drawer
+        open={addingProcess.opened}
+        onClose={(prevState) => setAddingProcess({ ...prevState, opened: false })}
+        anchor="right"
+      >
+        <Box
+          sx={{
+            width: "right" === "top" || "right" === "bottom" ? "auto" : 450,
+            padding: 5
+          }}
+          role="presentation"
+        >
+          <Typography variant="h3" gutterBottom>
+            New collection
+          </Typography>
+          <Stack spacing={1} direction="column">
+            <TextField
+              value={collection?.title || ''}
+              onChange={(e) => {
+                setCollection((prevState) => ({
+                  ...prevState,
+                  title: e.target.value,
+                }))
+              }}
+              required
+              id="outlined-size-small-title"
+              label="Title"
+              variant="outlined"
+              fullWidth
+            />
+            <TextField
+              value={collection?.description || ''}
+              onChange={(e) =>
+                setCollection((prevState) => ({
+                  ...prevState,
+                  description: e.target.value,
+                }))
+              }
+              id="outlined-size-small-description"
+              label="Description"
+              variant="outlined"
+              sx={{ width: '100%' }}
+            // fullWidth
+            />
+            <Autocomplete
+              value={collection?.key || null}
+              onChange={(event, newValue) => {
+                if (typeof newValue === "string") {
+                  setCollection((prevState) => ({
+                    ...prevState,
+                    key: newValue,
+                  }));
+                } else if (newValue && newValue.inputValue) {
+                  setCollection((prevState) => ({
+                    ...prevState,
+                    key: newValue.inputValue,
+                  }));
+                } else {
+                  setCollection((prevState) => ({
+                    ...prevState,
+                    key: newValue,
+                  }));
+                }
+              }}
+              filterOptions={(options, params) => {
+                const filtered = filter(options, params);
+
+                const { inputValue } = params;
+                const isExisting = options.some(
+                  (option) => inputValue === option
+                );
+                if (inputValue !== "" && !isExisting) {
+                  filtered.push(inputValue);
+                }
+
+                return filtered;
+              }}
+              selectOnFocus
+              clearOnBlur
+              handleHomeEndKeys
+              id="free-solo-keys"
+              options={
+                keyList && mapToKeyList(keyList).length
+                  ? mapToKeyList(keyList)
+                  : []
+              }
+              getOptionLabel={(option) => option}
+              renderOption={(props, option) => <li {...props}>{option}</li>}
+              sx={{ width: 300 }}
+              freeSolo
+              fullWidth
+              renderInput={(params) => (
+                <TextField
+                  required
+                  id="outlined-size-small-key"
+                  label="Key"
+                  variant="outlined"
+                  sx={{ width: 450 }}
+                  {...params}
+                />
+              )}
+            />
+            <Autocomplete
+              fullWidth
+              value={collection?.location || null}
+              onChange={(event, newValue) => {
+                if (typeof newValue === "string") {
+                  setCollection((prevState) => ({
+                    ...prevState,
+                    location: newValue,
+                  }));
+                } else if (newValue && newValue.inputValue) {
+                  setCollection((prevState) => ({
+                    ...prevState,
+                    location: newValue.inputValue,
+                  }));
+                } else {
+                  setCollection((prevState) => ({
+                    ...prevState,
+                    location: newValue,
+                  }));
+                }
+              }}
+              filterOptions={(options, params) => {
+                const filtered = filter(options, params);
+
+                const { inputValue } = params;
+                const isExisting = options.some(
+                  (option) => inputValue === option
+                );
+                if (inputValue !== "" && !isExisting) {
+                  filtered.push(inputValue);
+                }
+
+                return filtered;
+              }}
+              selectOnFocus
+              clearOnBlur
+              handleHomeEndKeys
+              id="free-solo-locations"
+              options={locationList}
+              getOptionLabel={(option) => option}
+              renderOption={(props, option) => <li {...props}>{option}</li>}
+              sx={{ width: 300 }}
+              freeSolo
+              renderInput={(params) => (
+                <TextField
+                  id="outlined-size-small-location"
+                  label="Location"
+                  variant="outlined"
+                  fullWidth
+                  sx={{ width: 450 }}
+                  {...params}
+                />
+              )}
+            />
+          </Stack>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <Box sx={{ m: 2, position: 'relative' }}>
+              <Fab
+                aria-label="save"
+                color="primary"
+                sx={{
+                  ...(addingProcess.success && {
+                    bgcolor: green[500],
+                    '&:hover': {
+                      bgcolor: green[700],
+                    },
+                  }),
+                }}
+                onClick={handleAddNewCollection}
+              >
+                {addingProcess.success ? <CheckCircleOutline /> : <SaveAsOutlined />}
+              </Fab>
+              {loading && (
+                <CircularProgress
+                  size={68}
+                  sx={{
+                    color: green[500],
+                    position: 'absolute',
+                    top: -6,
+                    left: -6,
+                    zIndex: 1,
+                  }}
+                />
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Drawer>
 
       {data &&
         data.collectionsWithLocations &&
@@ -352,7 +587,11 @@ const Home = () => {
               flexDirection: "column",
             }}
           >
-            <h4>{title}</h4>
+            <div style={{ maxWidth: "40%" }}>
+              <Typography>{title}</Typography>
+              <Divider style={{ marginBottom: 15 }} />
+            </div>
+
             <div
               style={{
                 display: "flex",
@@ -382,7 +621,10 @@ const Home = () => {
                       { text: "Edit", onClick: handleEdit },
                       {
                         text: "Remove",
-                        onClick: () => handleRemove(name, key, location),
+                        onClick: () => setIsRemoving({
+                          name,
+                          location
+                        }),
                         style: { color: "red" },
                       },
                     ]}
@@ -407,7 +649,10 @@ const Home = () => {
               flexDirection: "column",
             }}
           >
-            <h4>Without location</h4>
+            <div style={{ maxWidth: "40%" }}>
+              <Typography>Without location</Typography>
+              <Divider style={{ marginBottom: 15 }} />
+            </div>
             <div
               style={{
                 display: "flex",
@@ -436,7 +681,9 @@ const Home = () => {
                       { text: "Edit", onClick: handleEdit },
                       {
                         text: "Remove",
-                        onClick: () => handleRemove(name, key),
+                        onClick: () => setIsRemoving({
+                          name
+                        }),
                         style: { color: "red" },
                       },
                     ]}
@@ -446,6 +693,28 @@ const Home = () => {
             </div>
           </div>
         )}
+
+      <Dialog
+        open={!!isRemoving}
+        onClose={() => setIsRemoving(null)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          {"Are you sure?"}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            If you press "Remove", it permanently delete selected collection
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsRemoving(null)}>Cancel</Button>
+          <Button color='error' onClick={() => handleRemove(isRemoving.name, isRemoving.location)} autoFocus>
+            Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
