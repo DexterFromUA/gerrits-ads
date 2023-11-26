@@ -19,9 +19,14 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { AddCircleOutlineOutlined, CheckCircleOutline, LogoutOutlined, SaveAsOutlined } from "@mui/icons-material";
+import {
+  AddCircleOutlineOutlined,
+  CheckCircleOutline,
+  LogoutOutlined,
+  SaveAsOutlined,
+} from "@mui/icons-material";
 import { createFilterOptions } from "@mui/material/Autocomplete";
-import { green } from '@mui/material/colors';
+import { green } from "@mui/material/colors";
 
 import {
   addCollection,
@@ -31,9 +36,10 @@ import {
   removeCollection,
   getLocationList,
   getKeyList,
+  updateCollection,
 } from "../../services/fbService";
 import preview from "../../images/preview.jpg";
-import { Collection, CollectionWithInputs } from "../../components";
+import { Collection } from "../../components";
 import mapToKeyList from "../../utils/mapToKeyList";
 
 const Home = () => {
@@ -48,16 +54,20 @@ const Home = () => {
     opened: false,
     loading: false,
     error: false,
-    success: false
+    success: false,
+    type: "",
   });
   const [data, setData] = React.useState(null);
   const [collection, setCollection] = React.useState({});
+  const [editCollection, setEditCollection] = React.useState({});
   const [locationList, setLocationList] = React.useState([]);
   const [keyList, setKeyList] = React.useState(new Map());
-  const [isRemoving, setIsRemoving] = React.useState(null)
+  const [isRemoving, setIsRemoving] = React.useState(null);
+  const [isLogout, setIsLogout] = React.useState(false);
 
   React.useEffect(() => {
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const init = async () => {
@@ -106,62 +116,72 @@ const Home = () => {
     }
   };
 
-  const handleAddNewCollection = async () => {
-    setAddingProcess(prevState => ({ ...prevState, loading: true }))
+  const handleAddNewCollection = async (isEdit = false) => {
+    const parsedLocation = collection?.location
+      ? collection.location.replace(/[&\/\\#+()$~%.'":*?<>{}]/g, "")
+      : null;
+    setAddingProcess((prevState) => ({ ...prevState, loading: true }));
 
-    if (collection?.title && collection?.key) {
+    if (collection?.name && collection?.key) {
       if (
+        !isEdit &&
         keyList &&
         keyList
-          .get(collection.location ? collection.location : "withoutLocation")
+          .get(parsedLocation ? parsedLocation : "withoutLocation")
           ?.includes(collection.key)
       ) {
         alert.error("There is already a similar key in this location");
-
+        setAddingProcess((prevState) => ({ ...prevState, loading: false }));
+        return;
+      } else if (
+        isEdit &&
+        collection.key !== editCollection.key &&
+        keyList &&
+        keyList
+          .get(parsedLocation ? parsedLocation : "withoutLocation")
+          .filter((el) => el === collection.key).length > 0
+      ) {
+        alert.error(
+          "There is already a similar key in this location while edit"
+        );
+        setAddingProcess((prevState) => ({ ...prevState, loading: false }));
         return;
       } else {
+        const locationKey = parsedLocation ?? "withoutLocation";
+
         setKeyList((prevState) => {
-          if (collection.location) {
-            if (prevState.has(collection.location)) {
-              return prevState.set(collection.location, [
-                ...prevState.get(collection.location),
-                collection.key,
-              ]);
-            } else {
-              return prevState.set(collection.location, [collection.key]);
-            }
+          if (prevState.has(locationKey)) {
+            return prevState.set(locationKey, [
+              ...prevState.get(locationKey),
+              collection.key,
+            ]);
           } else {
-            return prevState.set(
-              "withoutLocation",
-              prevState.get(collection.location)
-                ? [...prevState.get("withoutLocation"), collection.key]
-                : [collection.key]
-            );
+            return prevState.set(locationKey, [collection.key]);
           }
         });
       }
 
       const result = await addCollection(
         uid,
-        collection.title,
+        collection.name,
         collection?.description ?? "",
         collection.key,
-        collection?.location ?? null,
-        null
+        parsedLocation,
+        editCollection?.data ?? []
       );
 
-      if (collection?.location && !locationList.includes(collection.location)) {
-        setLocationList((prevState) => [...prevState, collection.location]);
-      }
-
       if (result) {
-        alert.success("New collection added successfully");
-        setAddingProcess(prevState => ({ ...prevState, success: true }))
+        if (collection?.location && !locationList.includes(parsedLocation)) {
+          setLocationList((prevState) => [...prevState, parsedLocation]);
+        }
+        alert.success(
+          `New collection ${isEdit ? "edited" : "added"} successfully`
+        );
 
         setData((prevState) => {
-          if (collection.location) {
+          if (parsedLocation) {
             const selectedArray = prevState.collectionsWithLocations.filter(
-              (arr) => arr[0] === collection.location
+              (arr) => arr[0] === parsedLocation
             );
 
             if (selectedArray.length) {
@@ -169,17 +189,18 @@ const Home = () => {
                 ...prevState,
                 collectionsWithLocations: [
                   ...prevState.collectionsWithLocations.map((arr) => {
-                    if (arr[0] === collection.location) {
+                    if (arr[0] === parsedLocation) {
                       return [
                         arr[0],
                         [
                           ...arr[1],
                           {
-                            name: collection.title,
+                            name: collection.name,
                             description: collection?.description ?? "",
                             key: collection.key,
-                            location: collection.location,
+                            location: parsedLocation,
                             dateAdded: new Date().toDateString(),
+                            data: collection?.data ?? []
                           },
                         ],
                       ];
@@ -195,14 +216,15 @@ const Home = () => {
                 collectionsWithLocations: [
                   ...prevState.collectionsWithLocations,
                   [
-                    collection.location,
+                    parsedLocation,
                     [
                       {
-                        name: collection.title,
+                        name: collection.name,
                         description: collection?.description ?? "",
                         key: collection.key,
-                        location: collection.location,
-                        dateAdded: new Date().toDateString(),
+                        location: parsedLocation,
+                        dateAdded: new Date(),
+                        data: collection?.data ?? []
                       },
                     ],
                   ],
@@ -215,42 +237,91 @@ const Home = () => {
               collectionsWithoutLocations: [
                 ...prevState.collectionsWithoutLocations,
                 {
-                  name: collection.title,
+                  name: collection.name,
                   description: collection?.description ?? "",
                   key: collection.key,
                   location: null,
-                  dateAdded: new Date().toDateString(),
+                  dateAdded: new Date(),
+                  data: collection?.data ?? []
                 },
               ],
             };
           }
         });
         setCollection({});
-        setAddingProcess((prevState) => setAddingProcess({ ...prevState, opened: false }));
+        setEditCollection({});
+        setAddingProcess((prevState) => ({
+          ...prevState,
+          opened: false,
+          type: "",
+        }));
       }
     } else {
-      alert.error("Title and Key is important");
+      alert.error("Name and Key is important");
     }
 
-    setAddingProcess(prevState => ({ ...prevState, loading: true }))
+    setAddingProcess((prevState) => ({ ...prevState, loading: false }));
   };
 
   const handleSignOut = async () => {
-    await signOutUser();
+    try {
+      await signOutUser();
 
-    navigate("/login");
+      navigate("/login");
+    } catch (error) {
+      throw new Error(error);
+    }
   };
 
-  const handleEdit = () => {
-    console.log("edit");
+  const handleEdit = async () => {
+    if ((collection.name || collection.name) && collection.key) {
+      try {
+        const result = await handleRemove(
+          editCollection.name,
+          editCollection?.location ?? "",
+          collection.key,
+          true
+        );
+        if (result) {
+          await handleAddNewCollection(true);
+        }
+      } catch (error) {
+        alert.error("Error while updating");
+        throw new Error(error);
+      }
+    } else {
+      alert.error("name and Key is important");
+    }
   };
 
-  const handleRemove = async (collection, location) => {
-    const result = await removeCollection(uid, collection, location);
+  const handleRemove = async (collectionName, location, key, isEdit) => {
+    if (isEdit) {
+      const parsedLocation = collection?.location
+        ? collection.location.replace(/[&\/\\#+()$~%.'":*?<>{}]/g, "")
+        : null;
+
+      if (
+        (collection.location === location &&
+          collection.key !== editCollection.key &&
+          keyList
+            .get(parsedLocation ?? "withoutLocation")
+            .filter((el) => el === key).length > 0) ||
+        keyList
+          .get(parsedLocation ?? "withoutLocation")
+          .filter((el) => el === key).length > 0
+      ) {
+        alert.error(
+          "There is already a similar key in this location while edit"
+        );
+        return false;
+      }
+    }
+
+    const result = await removeCollection(uid, collectionName, location);
 
     if (result) {
-      alert.success("The collection has been removed successfully");
-      setIsRemoving(null)
+      !isEdit && alert.success("The collection has been removed successfully");
+      setIsRemoving(null);
 
       setData((prevState) => {
         if (location) {
@@ -261,7 +332,7 @@ const Home = () => {
                 if (location === arr[0]) {
                   return [
                     arr[0],
-                    [...arr[1].filter(({ name }) => name !== collection)],
+                    [...arr[1].filter(({ name }) => name !== collectionName)],
                   ];
                 } else {
                   return [...arr];
@@ -274,14 +345,28 @@ const Home = () => {
             ...prevState,
             collectionsWithoutLocations: [
               ...prevState.collectionsWithoutLocations.filter(
-                ({ name }) => name !== collection
+                ({ name }) => name !== collectionName
               ),
             ],
           };
         }
       });
+
+      const locationKey = location ?? "withoutLocation";
+      setKeyList((prevState) => {
+        if (prevState.has(locationKey)) {
+          return prevState.set(locationKey, [
+            ...prevState
+              .get(locationKey)
+              .filter((el) => el !== editCollection.key),
+          ]);
+        }
+      });
+
+      return true;
     } else {
       alert.error("Error while removing the collection");
+      return false;
     }
   };
 
@@ -365,14 +450,20 @@ const Home = () => {
           }}
         >
           <IconButton
-            onClick={(prevState) => setAddingProcess({ ...prevState, opened: true })}
+            onClick={() =>
+              setAddingProcess((prevState) => ({
+                ...prevState,
+                opened: true,
+                type: "post",
+              }))
+            }
             aria-label="add"
             style={{ marginRight: 20 }}
           >
             <AddCircleOutlineOutlined color="success" />
           </IconButton>
           <IconButton
-            onClick={handleSignOut}
+            onClick={() => setIsLogout(true)}
             aria-label="logout"
             style={{ marginRight: 20 }}
           >
@@ -383,36 +474,42 @@ const Home = () => {
 
       <Drawer
         open={addingProcess.opened}
-        onClose={(prevState) => setAddingProcess({ ...prevState, opened: false })}
+        onClose={() => {
+          setAddingProcess((prevState) => ({ ...prevState, opened: false }));
+          setCollection({});
+        }}
         anchor="right"
       >
         <Box
           sx={{
             width: "right" === "top" || "right" === "bottom" ? "auto" : 450,
-            padding: 5
+            padding: 5,
           }}
           role="presentation"
         >
           <Typography variant="h3" gutterBottom>
-            New collection
+            {addingProcess.type === "post"
+              ? "New collection"
+              : "Edit collection"}
           </Typography>
           <Stack spacing={1} direction="column">
             <TextField
-              value={collection?.title || ''}
+              value={collection?.name || collection?.name || ""}
               onChange={(e) => {
                 setCollection((prevState) => ({
                   ...prevState,
-                  title: e.target.value,
-                }))
+                  name: e.target.value,
+                }));
               }}
               required
               id="outlined-size-small-title"
-              label="Title"
+              label="Name"
               variant="outlined"
               fullWidth
+              disabled={addingProcess.type === "update"}
             />
             <TextField
-              value={collection?.description || ''}
+              value={collection?.description || ""}
               onChange={(e) =>
                 setCollection((prevState) => ({
                   ...prevState,
@@ -422,8 +519,7 @@ const Home = () => {
               id="outlined-size-small-description"
               label="Description"
               variant="outlined"
-              sx={{ width: '100%' }}
-            // fullWidth
+              sx={{ width: "100%" }}
             />
             <Autocomplete
               value={collection?.key || null}
@@ -539,29 +635,43 @@ const Home = () => {
             />
           </Stack>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-            <Box sx={{ m: 2, position: 'relative' }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+            }}
+          >
+            <Box sx={{ m: 2, position: "relative" }}>
               <Fab
                 aria-label="save"
                 color="primary"
                 sx={{
                   ...(addingProcess.success && {
                     bgcolor: green[500],
-                    '&:hover': {
+                    "&:hover": {
                       bgcolor: green[700],
                     },
                   }),
                 }}
-                onClick={handleAddNewCollection}
+                onClick={
+                  addingProcess.type === "post"
+                    ? () => handleAddNewCollection()
+                    : () => handleEdit()
+                }
               >
-                {addingProcess.success ? <CheckCircleOutline /> : <SaveAsOutlined />}
+                {addingProcess.success ? (
+                  <CheckCircleOutline />
+                ) : (
+                  <SaveAsOutlined />
+                )}
               </Fab>
               {loading && (
                 <CircularProgress
                   size={68}
                   sx={{
                     color: green[500],
-                    position: 'absolute',
+                    position: "absolute",
                     top: -6,
                     left: -6,
                     zIndex: 1,
@@ -576,7 +686,7 @@ const Home = () => {
       {data &&
         data.collectionsWithLocations &&
         data.collectionsWithLocations.length > 0 &&
-        data.collectionsWithLocations.map(([title, item], i) => (
+        data.collectionsWithLocations.map(([name, item], i) => (
           <div
             key={i}
             style={{
@@ -588,7 +698,7 @@ const Home = () => {
             }}
           >
             <div style={{ maxWidth: "40%" }}>
-              <Typography>{title}</Typography>
+              <Typography>{name}</Typography>
               <Divider style={{ marginBottom: 15 }} />
             </div>
 
@@ -602,29 +712,46 @@ const Home = () => {
               }}
             >
               {item && item.length > 0 ? (
-                item.map(({ name, description, location, data, key }, i) => (
+                item.map((item, i) => (
                   <Collection
-                    key={i + name}
-                    name={name}
-                    description={description}
+                    key={i + item.name}
+                    name={item.name}
+                    description={item.description}
                     onPress={() =>
-                      navigate(`collection/${name}`, {
+                      navigate(`collection/${item.name}`, {
                         state: {
-                          collectionName: name,
+                          collectionName: item.name,
                           withLocation: true,
-                          location,
+                          location: item.location,
                         },
                       })
                     }
-                    image={data && data.length > 0 ? data[0][0] : preview}
+                    image={
+                      item.data && item.data.length > 0
+                        ? item.data[0][0]
+                        : preview
+                    }
                     buttonList={[
-                      { text: "Edit", onClick: handleEdit },
+                      {
+                        text: "Edit",
+                        onClick: () => {
+                          setCollection({ ...item });
+                          setEditCollection({ ...item });
+                          setAddingProcess((prevState) => ({
+                            ...prevState,
+                            opened: true,
+                            type: "update",
+                          }));
+                        },
+                      },
                       {
                         text: "Remove",
-                        onClick: () => setIsRemoving({
-                          name,
-                          location
-                        }),
+                        onClick: () =>
+                          setIsRemoving({
+                            name: item.name,
+                            location: item.location,
+                            key: item.key,
+                          }),
                         style: { color: "red" },
                       },
                     ]}
@@ -662,34 +789,49 @@ const Home = () => {
                 alignItems: "center",
               }}
             >
-              {data.collectionsWithoutLocations.map(
-                ({ name, description, data, key }, i) => (
-                  <Collection
-                    key={i}
-                    name={name}
-                    description={description}
-                    onPress={() =>
-                      navigate(`collection/${name}`, {
-                        state: {
-                          collectionName: name,
-                          withLocation: false,
-                        },
-                      })
-                    }
-                    image={data && data.length > 0 ? data[0][0] : preview}
-                    buttonList={[
-                      { text: "Edit", onClick: handleEdit },
-                      {
-                        text: "Remove",
-                        onClick: () => setIsRemoving({
-                          name
-                        }),
-                        style: { color: "red" },
+              {data.collectionsWithoutLocations.map((item, i) => (
+                <Collection
+                  key={i}
+                  name={item.name}
+                  description={item.description}
+                  onPress={() =>
+                    navigate(`collection/${item.name}`, {
+                      state: {
+                        collectionName: item.name,
+                        withLocation: false,
                       },
-                    ]}
-                  />
-                )
-              )}
+                    })
+                  }
+                  image={
+                    item.data && item.data.length > 0
+                      ? item.data[0][0]
+                      : preview
+                  }
+                  buttonList={[
+                    {
+                      text: "Edit",
+                      onClick: () => {
+                        setCollection({ ...item });
+                        setEditCollection({ ...item });
+                        setAddingProcess((prevState) => ({
+                          ...prevState,
+                          opened: true,
+                          type: "update",
+                        }));
+                      },
+                    },
+                    {
+                      text: "Remove",
+                      onClick: () =>
+                        setIsRemoving({
+                          name: item.name,
+                          key: item.key,
+                        }),
+                      style: { color: "red" },
+                    },
+                  ]}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -700,18 +842,38 @@ const Home = () => {
         aria-labelledby="alert-dialog-title"
         aria-describedby="alert-dialog-description"
       >
-        <DialogTitle id="alert-dialog-title">
-          {"Are you sure?"}
-        </DialogTitle>
+        <DialogTitle id="alert-dialog-title">{"Are you sure?"}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
-            If you press "Remove", it permanently delete selected collection
+            If you press "Remove", it permanently delete "
+            {isRemoving?.name ?? "selected"}" collection
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setIsRemoving(null)}>Cancel</Button>
-          <Button color='error' onClick={() => handleRemove(isRemoving.name, isRemoving.location)} autoFocus>
+          <Button
+            color="error"
+            onClick={() =>
+              handleRemove(isRemoving.name, isRemoving.location, isRemoving.key)
+            }
+            autoFocus
+          >
             Remove
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={isLogout}
+        onClose={() => setIsLogout(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">{"Are you sure?"}</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setIsLogout(false)}>Cancel</Button>
+          <Button color="error" onClick={handleSignOut} autoFocus>
+            Logout
           </Button>
         </DialogActions>
       </Dialog>
