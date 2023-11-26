@@ -117,7 +117,7 @@ export const addCollection = async (
   description,
   key,
   location,
-  coordinates
+  data
 ) => {
   try {
     const path = `${user}/${
@@ -129,8 +129,8 @@ export const addCollection = async (
       description,
       key,
       location,
-      coordinates,
       dateAdded: new Date().toDateString(),
+      data,
     });
 
     return true;
@@ -212,7 +212,7 @@ export const updateCollection = async (user, id, location = null, data) => {
     ? user + "/locations/" + location + "/" + id
     : user + "/withoutLocations/" + id;
 
-  updates[path] = data;
+  updates[path] = { ...data };
 
   try {
     await update(ref(database), updates);
