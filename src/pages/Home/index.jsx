@@ -167,7 +167,8 @@ const Home = () => {
         collection?.description ?? "",
         collection.key,
         parsedLocation,
-        editCollection?.data ?? []
+        editCollection?.data ?? [],
+        collection?.dateAdded ?? new Date().toDateString()
       );
 
       if (result) {
@@ -199,7 +200,7 @@ const Home = () => {
                             description: collection?.description ?? "",
                             key: collection.key,
                             location: parsedLocation,
-                            dateAdded: new Date().toDateString(),
+                            dateAdded: collection?.dateAdded ?? new Date().toDateString(),
                             data: collection?.data ?? []
                           },
                         ],
@@ -223,7 +224,7 @@ const Home = () => {
                         description: collection?.description ?? "",
                         key: collection.key,
                         location: parsedLocation,
-                        dateAdded: new Date(),
+                        dateAdded: collection?.dateAdded ?? new Date().toDateString(),
                         data: collection?.data ?? []
                       },
                     ],
@@ -241,7 +242,7 @@ const Home = () => {
                   description: collection?.description ?? "",
                   key: collection.key,
                   location: null,
-                  dateAdded: new Date(),
+                  dateAdded: collection?.dateAdded ?? new Date().toDateString(),
                   data: collection?.data ?? []
                 },
               ],
@@ -656,7 +657,10 @@ const Home = () => {
                 }}
                 onClick={
                   addingProcess.type === "post"
-                    ? () => handleAddNewCollection()
+                    ? () => {
+                      setCollection({ dateAdded: new Date().toDateString() })
+                      handleAddNewCollection()
+                    }
                     : () => handleEdit()
                 }
               >
@@ -717,6 +721,7 @@ const Home = () => {
                     key={i + item.name}
                     name={item.name}
                     description={item.description}
+                    date={item.dateAdded}
                     onPress={() =>
                       navigate(`collection/${item.name}`, {
                         state: {
@@ -794,6 +799,7 @@ const Home = () => {
                   key={i}
                   name={item.name}
                   description={item.description}
+                  date={item.dateAdded}
                   onPress={() =>
                     navigate(`collection/${item.name}`, {
                       state: {

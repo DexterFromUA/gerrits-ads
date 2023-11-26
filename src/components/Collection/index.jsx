@@ -2,7 +2,7 @@ import React from 'react'
 import { Card, CardActionArea, CardActions, CardContent, CardMedia, IconButton, Typography } from '@mui/material'
 import { DeleteOutline, EditOutlined } from '@mui/icons-material'
 
-export default ({ name, description, onPress, image, buttonList }) => {
+export default ({ name, description, onPress, image, buttonList, date }) => {
   return (
     <Card sx={{ width: 345, marginLeft: 4, marginBottom: 2 }} elevation={4}>
       <CardActionArea onClick={onPress}>
@@ -21,6 +21,9 @@ export default ({ name, description, onPress, image, buttonList }) => {
         </CardContent>
       </CardActionArea>
       <CardActions style={{ justifyContent: 'flex-end' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ marginRight: 2 }}>
+          {date}
+        </Typography>
         {buttonList && buttonList.length > 0 && buttonList.map(({ text, onClick }, i) => <IconButton key={i} onClick={onClick} aria-label={text}>
           {text === 'Remove' && <DeleteOutline color='error' />}
           {text === 'Edit' && <EditOutlined />}

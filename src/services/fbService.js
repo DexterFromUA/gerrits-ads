@@ -117,7 +117,8 @@ export const addCollection = async (
   description,
   key,
   location,
-  data
+  data,
+  date
 ) => {
   try {
     const path = `${user}/${
@@ -129,7 +130,7 @@ export const addCollection = async (
       description,
       key,
       location,
-      dateAdded: new Date().toDateString(),
+      dateAdded: date ?? new Date().toDateString(),
       data,
     });
 
